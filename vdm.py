@@ -551,13 +551,13 @@ class LightVDM(LightningModule):
             ax.flat[4].set_title("Power")
 
             k, P, N = power(x)
-            ax.flat[4].loglog(k.cpu(), P.cpu(), label="True DM", color='#e98d6b')
+            ax.flat[5].loglog(k.cpu(), P.cpu(), label="True DM", color='#e98d6b')
             k, P, N = power(sample)
-            ax.flat[4].loglog(k.cpu(), P.cpu(), label="Sampled DM", color='#b13c6c')
-            ax.flat[4].legend(fontsize=12)
-            ax.flat[4].set_xlabel('k',fontsize=15)
-            ax.flat[4].set_ylabel(r'$P*k^2$',fontsize=15)
-            ax.flat[4].set_title("Averaged Power")
+            ax.flat[5].loglog(k.cpu(), P.cpu(), label="Sampled DM", color='#b13c6c')
+            ax.flat[5].legend(fontsize=12)
+            ax.flat[5].set_xlabel('k',fontsize=15)
+            ax.flat[5].set_ylabel(r'$P*k^2$',fontsize=15)
+            ax.flat[5].set_title("Averaged Power")
 
             fig.suptitle(title)
 
