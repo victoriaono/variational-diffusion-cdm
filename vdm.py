@@ -531,7 +531,7 @@ class LightVDM(LightningModule):
             title = titles[indices.index(batch_idx)]
 
             fig, ax = plt.subplots(ncols=3, nrows=2, figsize=(15, 10))
-            ax[0].imshow(conditioning[0].squeeze().cpu(), cmap='cividis', vmin=-.5, vmax=2)
+            ax.flat[0].imshow(conditioning[0].squeeze().cpu(), cmap='cividis', vmin=-.5, vmax=2)
             ax.flat[1].imshow(x[0].squeeze().cpu(), cmap='cividis', vmin=-3, vmax=3)
             ax.flat[2].imshow(sample[0].squeeze().cpu(), cmap='cividis', vmin=-3, vmax=3)
             ax.flat[0].set_title("Stars")
