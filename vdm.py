@@ -18,7 +18,7 @@ class VDM(nn.Module):
     def __init__(
         self,
         score_model: nn.Module,
-        noise_schedule: str = "fixed_linear",
+        noise_schedule: str = "learned_linear",
         gamma_min: float = -13.3,
         gamma_max: float = 5.0,
         antithetic_time_sampling: bool = True,
@@ -346,7 +346,7 @@ class LightVDM(LightningModule):
     def __init__(
         self,
         score_model: nn.Module,
-        learning_rate: float = 3.0e-4,
+        learning_rate: float = 1.0e-4,
         weight_decay: float = 1.0e-5,
         n_sampling_steps: int = 250,
         image_shape: Tuple[int] = (1, 256, 256),
@@ -369,6 +369,7 @@ class LightVDM(LightningModule):
             gamma_max=gamma_max,
             image_shape=image_shape,
         )
+        self.params = pandas.read_csv('/n/holystore01/LABS/itc_lab/Lab/Camels/2D_maps/params_1P_IllustrisTNG.txt', sep=' ', header=None)
 
     def forward(self, x: Tensor, conditioning: Tensor) -> Tensor:
         """get loss for samples
@@ -459,7 +460,7 @@ class LightVDM(LightningModule):
             )
 
             fig, ax = plt.subplots(ncols=3, nrows=2, figsize=(15,10))            
-            ax.flat[0].imshow(conditioning[0].squeeze().cpu(), cmap='cividis')
+            ax.flat[0].imshow(conditioning[0].squeeze().cpu(), cmap='cividis', vmin=-.5, vmax=2)
             ax.flat[1].imshow(x[0].squeeze().cpu(), cmap='cividis', vmin=-3, vmax=3)
             ax.flat[2].imshow(sample[0].squeeze().cpu(), cmap='cividis', vmin=-3, vmax=3)
             ax.flat[0].set_title("Stars")
@@ -514,59 +515,97 @@ class LightVDM(LightningModule):
         torch.save(P_true, f'debiasing/powers/dm/true_128_batch_{batch_idx}.pt')
         torch.save(P_pred, f'debiasing/powers/dm/pred_128_batch_{batch_idx}.pt')
         '''
-
-        # low and high parameter values
-        indices = [5, 0, 10, 11, 21, 22, 32, 33, 43, 44, 54, 55, 65]
-        titles = ['Typical', r'Low $\Omega_m$', r'High $\Omega_m$', r'Low $\sigma_8$', r'High $\sigma_8$', 
-          r'Low $A_{SN1}$', r'High $A_{SN1}$', r'Low $A_{AGN1}$', r'High $A_{AGN1}$',
-          r'Low $A_{SN2}$', r'High $A_{SN2}$', r'Low $A_{AGN2}$', r'High $A_{AGN2}$']
-        
-        if batch_idx in indices:
-            sample = self.draw_samples(
+        sample = self.draw_samples(
             conditioning=conditioning,
             batch_size=len(x),
             n_sampling_steps=self.hparams.n_sampling_steps,
             )
 
-            title = titles[indices.index(batch_idx)]
+        # sample and plot for every parameter value change
+        if batch_idx % 15 == 0:
+            
+            fig, ax = plt.subplots(ncols=3, figsize=(15, 10))
+            ax[0].imshow(conditioning[0].squeeze().cpu(), cmap='cividis', vmin=-.5, vmax=2)
+            ax[1].imshow(x[0].squeeze().cpu(), cmap='cividis', vmin=-3, vmax=3)
+            ax[2].imshow(sample[0].squeeze().cpu(), cmap='cividis', vmin=-3, vmax=3)
+            ax[0].set_title("Stars")
+            ax[1].set_title("True DM")
+            ax[2].set_title("Sampled DM")
+            fig.suptitle(f'Parameter index {batch_idx // 15}')
+            self.logger.experiment.log_figure(figure=plt,
+                figure_name="1P set")
 
-            fig, ax = plt.subplots(ncols=3, nrows=2, figsize=(15, 10))
-            ax.flat[0].imshow(conditioning[0].squeeze().cpu(), cmap='cividis', vmin=-.5, vmax=2)
-            ax.flat[1].imshow(x[0].squeeze().cpu(), cmap='cividis', vmin=-3, vmax=3)
-            ax.flat[2].imshow(sample[0].squeeze().cpu(), cmap='cividis', vmin=-3, vmax=3)
-            ax.flat[0].set_title("Stars")
-            ax.flat[1].set_title("True DM")
-            ax.flat[2].set_title("Sampled DM")
-            ax.flat[3].hist(x[0].cpu().numpy().flatten(), bins=np.linspace(-4, 4, 20), alpha=0.5, color='#e98d6b', label="True DM")
-            ax.flat[3].hist(sample[0].cpu().numpy().flatten(), bins=np.linspace(-4, 4, 20), alpha=0.5, color='#b13c6c', label="Sampled DM")
-            ax.flat[3].legend(fontsize=12)
-            ax.flat[3].set_title("Density")
-            k, P, N = power(x[0])
-            ax.flat[4].loglog(k.cpu(), P.cpu()*(k.cpu()**2), label="True DM", color='#e98d6b')
-            k, P, N = power(sample[0])
-            ax.flat[4].loglog(k.cpu(), P.cpu()*(k.cpu()**2), label="Sampled DM", color='#b13c6c')
-            ax.flat[4].legend(fontsize=12)
-            ax.flat[4].set_xlabel('k',fontsize=15)
-            ax.flat[4].set_ylabel(r'$P*k^2$',fontsize=15)
-            ax.flat[4].set_title("Power")
+        # save power spectra values to plot later
+        k, P, N = power(x)
+        torch.save(P, f'debiasing/powers/dm/true_256_{batch_idx}.pt')
+        k, P, N = power(sample)
+        torch.save(P, f'debiasing/powers/dm/pred_256_{batch_idx}.pt')
 
-            k, P, N = power(x)
-            ax.flat[5].loglog(k.cpu(), P.cpu()*(k.cpu()**2), label="True DM", color='#e98d6b')
-            k, P, N = power(sample)
-            ax.flat[5].loglog(k.cpu(), P.cpu()*(k.cpu()**2), label="Sampled DM", color='#b13c6c')
-            ax.flat[5].legend(fontsize=12)
-            ax.flat[5].set_xlabel('k',fontsize=15)
-            ax.flat[5].set_ylabel(r'$P*k^2$',fontsize=15)
-            ax.flat[5].set_title("Averaged Power")
+        # if batch_idx in indices:
+            # title = titles[indices.index(batch_idx)]
 
-            fig.suptitle(title)
+            # fig, ax = plt.subplots(ncols=3, nrows=2, figsize=(15, 10))
+            # ax.flat[0].imshow(conditioning[0].squeeze().cpu(), cmap='cividis', vmin=-.5, vmax=2)
+            # ax.flat[1].imshow(x[0].squeeze().cpu(), cmap='cividis', vmin=-3, vmax=3)
+            # ax.flat[2].imshow(sample[0].squeeze().cpu(), cmap='cividis', vmin=-3, vmax=3)
+            # ax.flat[0].set_title("Stars")
+            # ax.flat[1].set_title("True DM")
+            # ax.flat[2].set_title("Sampled DM")
+            # ax.flat[3].hist(x[0].cpu().numpy().flatten(), bins=np.linspace(-4, 4, 20), alpha=0.5, color='#e98d6b', label="True DM")
+            # ax.flat[3].hist(sample[0].cpu().numpy().flatten(), bins=np.linspace(-4, 4, 20), alpha=0.5, color='#b13c6c', label="Sampled DM")
+            # ax.flat[3].legend(fontsize=12)
+            # ax.flat[3].set_title("Density")
+            # k, P, N = power(conditioning[0])
+            # ax.flat[4].loglog(k.cpu(), P.cpu()*(k.cpu()**2), label="Star field", color='#6c2b6d')
+            # k, P, N = power(x[0])
+            # # torch.save(P, f'debiasing/powers/dm/true_256_single_batch_{batch_idx}.pt')
+            # ax.flat[4].loglog(k.cpu(), P.cpu()*(k.cpu()**2), label="True DM", color='#e98d6b')
+            # k, P, N = power(sample[0])
+            # # torch.save(P, f'debiasing/powers/dm/pred_256_single_batch_{batch_idx}.pt')
+            # ax.flat[4].loglog(k.cpu(), P.cpu()*(k.cpu()**2), label="Sampled DM", color='#b13c6c')
+            # ax.flat[4].legend(fontsize=12)
+            # ax.flat[4].set_xlabel('k',fontsize=15)
+            # ax.flat[4].set_ylabel(r'$P*k^2$',fontsize=15)
+            # ax.flat[4].set_title("Auto-Correlation Power")
 
-            if self.logger is not None:
-                self.logger.experiment.log_figure(figure=plt,
-                figure_name="1P sample")
-                loss = F.mse_loss(sample, x)
-                self.logger.log_metrics({"test_loss": loss})
-            plt.close()
+            # k, P, N = power(conditioning[0])
+            # ax.flat[5].loglog(k.cpu(), P.cpu()*(k.cpu()**2), label="Star field", color='#6c2b6d')
+            # k, P, N = power(conditioning[0], x[0])
+            # # torch.save(P, f'debiasing/powers/cross/true_256_single_batch_{batch_idx}.pt')
+            # ax.flat[5].loglog(k.cpu(), P.cpu()*(k.cpu()**2), label="Star x True DM", color='#e98d6b')
+            # k, P, N = power(conditioning[0], sample[0])
+            # # torch.save(P, f'debiasing/powers/cross/pred_256_single_batch_{batch_idx}.pt')
+            # ax.flat[5].loglog(k.cpu(), P.cpu()*(k.cpu()**2), label="Star x Sampled DM", color='#b13c6c')
+            # ax.flat[5].legend(fontsize=12)
+            # ax.flat[5].set_xlabel('k',fontsize=15)
+            # ax.flat[5].set_ylabel(r'$P*k^2$',fontsize=15)
+            # ax.flat[5].set_title("Cross-Correlation Power")
+
+            # ax.flat[5].text(0.1, 0.9, f'{labels[0]}: {self.params.iloc[batch_idx//15][0]}')
+            # ax.flat[5].text(0.1, 0.8, f'{labels[1]}: {self.params.iloc[batch_idx//15][1]}')
+            # ax.flat[5].text(0.1, 0.7, f'{labels[2]}: {self.params.iloc[batch_idx//15][2]}')
+            # ax.flat[5].text(0.1, 0.6, f'{labels[3]}: {self.params.iloc[batch_idx//15][3]}')
+            # ax.flat[5].text(0.1, 0.5, f'{labels[4]}: {self.params.iloc[batch_idx//15][4]}')
+            # ax.flat[5].text(0.1, 0.4, f'{labels[5]}: {self.params.iloc[batch_idx//15][5]}')
+            # ax.flat[5].set_axis_off()
+
+            # k, P, N = power(x)
+            # ax.flat[5].loglog(k.cpu(), P.cpu()*(k.cpu()**2), label="True DM", color='#e98d6b')
+            # k, P, N = power(sample)
+            # ax.flat[5].loglog(k.cpu(), P.cpu()*(k.cpu()**2), label="Sampled DM", color='#b13c6c')
+            # ax.flat[5].legend(fontsize=12)
+            # ax.flat[5].set_xlabel('k',fontsize=15)
+            # ax.flat[5].set_ylabel(r'$P*k^2$',fontsize=15)
+            # ax.flat[5].set_title("Averaged Power")
+
+            # fig.suptitle(title)
+
+            # if self.logger is not None:
+            #     self.logger.experiment.log_figure(figure=plt,
+            #     figure_name="1P sample")
+            #     loss = F.mse_loss(sample, x)
+            #     self.logger.log_metrics({"test_loss": loss})
+            #     plt.close()
 
             
     def generate_samples(self, batch, batch_idx, batch_size, n=150):
@@ -658,5 +697,5 @@ class LightVDM(LightningModule):
         return {'optimizer': optimizer, 
                 'lr_scheduler': scheduler,
                 'monitor': 'val_loss',
-                'interval': 'epoch',
-                'frequency': 2}
+                'interval': 'step',
+                'frequency': 20}
