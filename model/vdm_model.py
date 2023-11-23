@@ -382,6 +382,7 @@ class LightVDM(LightningModule):
             **kwargs
         )
         self.dataset=dataset
+        print("VDM:", self.dataset)
         self.draw_figure=draw_figure
         if self.draw_figure is None:
             def draw_figure(args,**kwargs):

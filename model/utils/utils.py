@@ -3,6 +3,7 @@ import numpy as np
 import torch.nn as nn
 import math
 import matplotlib.pyplot as plt
+from data.constants import norms, boxsize
 
 def to_np(ten):
     return ten.detach().cpu().numpy()
@@ -118,6 +119,24 @@ def pk(fields):
         nss.append(ns)
     return torch.stack(kss,dim=0),torch.stack(pkss,dim=0),torch.stack(nss,dim=0)
 
+k_conversion = 2*np.pi/boxsize
+def compute_pk(field, field_b=None,):
+    # Assumes field has shape (1,1,Npixels, Npixels)
+    assert len(field.shape) == 4
+    if field_b is not None:
+        assert len(field_b.shape) == 4
+        k, pk, _ = power(
+            torch.Tensor(field/np.sum(field)),
+            torch.Tensor(field_b/np.sum(field_b)),
+        )
+    else:
+        k, pk, _ = power(
+            torch.Tensor(field/np.sum(field)),
+        )
+    k *= k_conversion
+    pk *= boxsize**2
+    return k, pk
+
 class MonotonicLinear(nn.Module):
     __constants__ = ['in_features', 'out_features']
     in_features: int
@@ -177,19 +196,6 @@ class NNSchedule(nn.Module):
         return g.reshape(t_sh)
 
 def draw_figure(x,sample,conditioning,dataset):
-    norms = {'illustris': [0.11826974898576736,
-                           1.0741989612579346,
-                           10.971004486083984,
-                           0.5090954303741455],
-             'astrid': [0.25111075866953375,
-                        1.5009703444737252,
-                        10.98079881110118,
-                        0.508634126544588],
-             'simba': [0.15442040600996018,
-                       1.228990472998391,
-                       10.984281457471027,
-                       0.5084984549432943]
-            }
     mean_input = norms[dataset][0]
     std_input= norms[dataset][1]
     mean_target= norms[dataset][2]
@@ -208,15 +214,15 @@ def draw_figure(x,sample,conditioning,dataset):
     ax.flat[3].legend(fontsize=9)
     ax.flat[3].set_title("Density", fontsize=fontsize)
 
-    # conditioning = 10 ** (conditioning * std_target + mean_target)
-    # k, P, N = power(conditioning)
-    # ax.flat[4].loglog(k.cpu(), P.cpu(), label="Stars", color='#c09465')
-    x = 10 ** (x * std_input + mean_input)
-    k, P, N = power(x)
-    ax.flat[4].loglog(k.cpu(), P.cpu(), label="True DM", color='#4c4173')
+    conditioning = 10 ** (conditioning * std_input + mean_input)
+    k, P = compute_pk(conditioning.cpu().numpy())
+    ax.flat[4].loglog(k, P, label="Stars", color='#c09465')
+    x = 10 ** (x * std_target + mean_target)
+    k, P = compute_pk(x.cpu().numpy())
+    ax.flat[4].loglog(k, P, label="True DM", color='#4c4173')
     sample = 10 ** (sample * std_target + mean_target)
-    k, P, N = power(sample)
-    ax.flat[4].loglog(k.cpu(), P.cpu(), label="Sampled DM", color='#709bb5')
+    k, P = compute_pk(sample.cpu().numpy())
+    ax.flat[4].loglog(k, P, label="Sampled DM", color='#709bb5')
     ax.flat[4].legend(fontsize=9)
     ax.flat[4].set_xlabel('k',fontsize=fontsize)
     ax.flat[4].set_ylabel('P(k)',fontsize=fontsize)

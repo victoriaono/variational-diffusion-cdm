@@ -188,94 +188,6 @@ class FourierFeatures(nn.Module):
         # Output features are cos and sin of above. Shape (B, 2 * F * C, H, W).
         return torch.cat([features.sin(), features.cos()], dim=1)
 
-class UNet4VDM(nn.Module):#n_channels increasing by *2
-    def __init__(
-        self,
-        input_channels: int = 1,
-        conditioning_channels: int = 1,
-        embedding_dim: int=32,
-        n_blocks: int = 4,  
-        norm_groups: int = 8,
-
-        dropout_prob: float = 0.1,
-        gamma_min: float = -13.3,
-        gamma_max: float = 5.0,
-    ):
-        super().__init__()
-        self.embedding_dim = embedding_dim
-        self.gamma_min = gamma_min
-        self.gamma_max = gamma_max
-        
-        resnet_params = dict(
-            condition_dim=4 * embedding_dim,
-            dropout_prob=dropout_prob,
-            norm_groups=norm_groups,
-        )
-        self.embed_t_conditioning = nn.Sequential(
-            nn.Linear(embedding_dim, embedding_dim * 4),
-            nn.SiLU(),
-            nn.Linear(embedding_dim * 4, embedding_dim * 4),
-            nn.SiLU(),
-        )
-        total_input_ch = input_channels + conditioning_channels
-
-        self.conv_in = nn.Conv2d(total_input_ch, embedding_dim, kernel_size=3, padding=1,padding_mode="circular")
-        
-        #Down of UNet
-        self.down_blocks = nn.ModuleList()
-        dim=embedding_dim
-        for i in range(n_blocks):
-            self.down_blocks.append(DownBlock(resnet_block=ResnetBlock(ch_in=(dim//2 if i!=0 else dim),ch_out=dim,**resnet_params)))
-            dim*=2
-        #Mid of UNet
-        self.mid_resnet_block = ResnetBlock(ch_in=dim//2,ch_out=dim,**resnet_params)
-        #Up of UNet
-        self.up_blocks = nn.ModuleList()
-        for i in range(n_blocks):
-            dim//=2
-            self.up_blocks.append(UpBlock(resnet_block=ResnetBlock(ch_in=dim*2,ch_out=dim,**resnet_params)))
-
-        self.conv_out = nn.Sequential(
-            nn.GroupNorm(num_groups=norm_groups, num_channels=embedding_dim),
-            nn.SiLU(),
-            zero_init(nn.Conv2d(embedding_dim, input_channels, 3, padding=1,padding_mode="circular")),
-        )
-
-    def forward(self,z,g_t,conditioning=None):
-        #concatenate conditioning
-        if conditioning is not None:
-            z_concat = torch.concat((z, conditioning),axis=1,)
-        else:
-            z_concat = z
-
-        # Get gamma to shape (B, ).
-        g_t = g_t.expand(z_concat.shape[0])  # shape () or (1,) or (B,) -> (B,)
-        assert g_t.shape == (z_concat.shape[0],)
-
-        # Rescale to [0, 1], but only approximately since gamma0 & gamma1 are not fixed.
-        g_t = (g_t - self.gamma_min) / (self.gamma_max - self.gamma_min)
-        t_embedding = get_timestep_embedding(g_t, self.embedding_dim) #(B, embedding_dim)
-        # We will condition on time embedding.
-        t_cond = self.embed_t_conditioning(t_embedding) # (B, 4 * embedding_dim)
-
-        h = z_concat #(B, C, H, W, D)
-
-        #standard UNet from here but with cond at each layer
-        h = self.conv_in(h)  # (B, embedding_dim, H, W)
-        #print(h.shape)
-        hs = []
-        for down_block in self.down_blocks:  # n_blocks times
-            h,hskip = down_block(h, cond=t_cond)
-            hs.append(hskip)
-            #print(h.shape)
-        h = self.mid_resnet_block(h, t_cond)
-        #print(h.shape)
-        for up_block in self.up_blocks:  # n_blocks times
-            h = up_block(x=h,xskip=hs.pop(),cond=t_cond)
-            #print(h.shape)
-        prediction = self.conv_out(h)
-        return prediction + z
-
 class UNetVDM(nn.Module): # with attention and fourier options
     def __init__(
         self,
@@ -303,7 +215,7 @@ class UNetVDM(nn.Module): # with attention and fourier options
 
         attention_params = dict(
             n_heads=n_attention_heads, #1
-            n_channels=embedding_dim, #48
+            n_channels=(2**n_blocks)*embedding_dim, #48
             norm_groups=norm_groups, #8
         )
         
@@ -315,8 +227,8 @@ class UNetVDM(nn.Module): # with attention and fourier options
 
         if use_fourier_features:
             self.fourier_features = FourierFeatures(
-                first=-4.0,
-                last=2,
+                first=-2.0,
+                last=1,
                 step=1,
             )
 
@@ -333,63 +245,27 @@ class UNetVDM(nn.Module): # with attention and fourier options
 
         self.conv_in = nn.Conv2d(total_input_ch, embedding_dim, kernel_size=3, padding=1, padding_mode="circular")
         
-        if self.add_downsampling:
-            #Down of UNet
-            self.down_blocks = nn.ModuleList()
-            dim=embedding_dim #48
-            for i in range(n_blocks):  #4
-                self.down_blocks.append(DownBlock(resnet_block=ResnetBlock(ch_in=(dim//2 if i!=0 else dim),ch_out=dim,**resnet_params)))
-                dim*=2
-            #dim= 768
-            #Mid of UNet
-            #ch_in=384
+        #Down of UNet
+        self.down_blocks = nn.ModuleList()
+        dim = embedding_dim #48
+        for i in range(n_blocks):  #4
+            self.down_blocks.append(DownBlock(resnet_block=ResnetBlock(ch_in=(dim//2 if i!=0 else dim),ch_out=dim,**resnet_params)))
+            dim *= 2
+        # dim = 768
+
+        #Mid of UNet
+        if self.add_attention:
+            self.mid_resnet_block_1 = ResnetBlock(ch_in=dim//2,ch_out=dim,**resnet_params)
+            self.mid_attn_block = AttentionBlock(**attention_params)
+            self.mid_resnet_block_2 = ResnetBlock(ch_in=dim,ch_out=dim,**resnet_params)
+        else:
             self.mid_resnet_block = ResnetBlock(ch_in=dim//2,ch_out=dim,**resnet_params)
 
-            # experimenting here
-            # self.mid_resnet_block_1 = ResnetBlock(ch_in=dim,ch_out=dim,**resnet_params)
-            
-            if self.add_attention:
-                self.mid_attn_block = AttentionBlock(**attention_params)
-                
-            # self.mid_resnet_block_2 = ResnetBlock(ch_in=dim,ch_out=dim,**resnet_params)
-
-            #Up of UNet
-            self.up_blocks = nn.ModuleList()
-            for i in range(n_blocks):
-                dim//=2
-                self.up_blocks.append(UpBlock(resnet_block=ResnetBlock(ch_in=dim*2,ch_out=dim,**resnet_params)))
-        else:
-            # Down path: n_blocks blocks with a resnet block and maybe attention.
-            resnet_params["ch_in"] = 4*embedding_dim
-            resnet_params["ch_out"] = 4*embedding_dim
-            self.down_blocks = nn.ModuleList(
-                UpDownBlock(
-                    resnet_block=ResnetBlock(**resnet_params),
-                    attention_block=AttentionBlock(**attention_params)
-                    if attention_everywhere
-                    else None,
-                )
-                for _ in range(n_blocks)
-            )
-
-            self.mid_resnet_block_1 = ResnetBlock(**resnet_params)
-            
-            if self.add_attention:
-                self.mid_attn_block = AttentionBlock(**attention_params)
-                
-            self.mid_resnet_block_2 = ResnetBlock(**resnet_params)
-
-            # Up path: n_blocks+1 blocks with a resnet block and maybe attention.
-            resnet_params["ch_in"] *= 2  # double input channels due to skip connections
-            self.up_blocks = nn.ModuleList(
-                UpDownBlock(
-                    resnet_block=ResnetBlock(**resnet_params),
-                    attention_block=AttentionBlock(**attention_params)
-                    if attention_everywhere
-                    else None,
-                )
-                for _ in range(n_blocks + 1)
-            )
+        #Up of UNet
+        self.up_blocks = nn.ModuleList()
+        for i in range(n_blocks):
+            self.up_blocks.append(UpBlock(resnet_block=ResnetBlock(ch_in=dim,ch_out=dim//2,**resnet_params)))
+            dim //= 2
 
         self.conv_out = nn.Sequential(
             nn.GroupNorm(num_groups=norm_groups, num_channels=embedding_dim),
@@ -418,37 +294,22 @@ class UNetVDM(nn.Module): # with attention and fourier options
 
         #standard UNet from here but with cond at each layer
         h = self.conv_in(h)  # (B, embedding_dim, H, W)
-        #print(h.shape)
         hs = []
 
-        if self.add_downsampling:
-            for down_block in self.down_blocks:  # n_blocks times
-                h,hskip = down_block(h, cond=t_cond)
-                hs.append(hskip)
-                print(h.shape)
-            h = self.mid_resnet_block(h, t_cond) # shape [12, 768, 16, 16]
-            # h = self.mid_resnet_block_1(h, t_cond)
-            # print("before mid_attn:", h.shape) 
-            if self.add_attention:
-                h = self.mid_attn_block(h)
-            # print("after", h.shape)
-            for up_block in self.up_blocks:  # n_blocks times
-                h = up_block(x=h,xskip=hs.pop(),cond=t_cond)
-                #print(h.shape)
-        else:
-            for down_block in self.down_blocks:  # n_blocks times
-                hs.append(h)
-                h = down_block(h, t_cond)
-            hs.append(h)
+        for down_block in self.down_blocks:  # n_blocks times
+            h, hskip = down_block(h, cond=t_cond)
+            hs.append(hskip)
+
+        if self.add_attention:
             h = self.mid_resnet_block_1(h, t_cond)
-            
-            if self.add_attention:
-                h = self.mid_attn_block(h)
-                
+            h = self.mid_attn_block(h)
             h = self.mid_resnet_block_2(h, t_cond)
-            for up_block in self.up_blocks:  # n_blocks+1 times
-                h = torch.cat([h, hs.pop()], dim=1)
-                h = up_block(h, t_cond)
+        
+        else:
+            h = self.mid_resnet_block(h, t_cond)
+
+        for up_block in self.up_blocks:  # n_blocks times
+            h = up_block(x=h,xskip=hs.pop(),cond=t_cond)
         
         prediction = self.conv_out(h)
         return prediction + z
