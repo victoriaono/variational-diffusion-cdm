@@ -354,8 +354,8 @@ class LightVDM(LightningModule):
         weight_decay: float = 1.0e-5,
         n_sampling_steps: int = 250,
         image_shape: Tuple[int] = (1, 128, 128),
-        gamma_min: float = -12.5,
-        gamma_max: float = 5.5,
+        gamma_min: float = -13.3,
+        gamma_max: float = 5.0,
         #gamma_min_max: float = -9.0,
         #gamma_max_min: float = 4.0,
         draw_figure=None,
@@ -382,7 +382,7 @@ class LightVDM(LightningModule):
             **kwargs
         )
         self.dataset=dataset
-        print("VDM:", self.dataset)
+        # print("VDM:", self.dataset)
         self.draw_figure=draw_figure
         if self.draw_figure is None:
             def draw_figure(args,**kwargs):

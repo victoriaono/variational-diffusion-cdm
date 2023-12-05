@@ -21,7 +21,7 @@ def train(
     comet_logger = CometLogger(
             api_key=os.environ.get("COMET_API_KEY"),
             project_name="debiasing",
-            experiment_name="astrid-11-20"
+            experiment_name="24-embedding-12-3"
         )
 
     # Checkpoint every time val_loss improves
@@ -31,12 +31,12 @@ def train(
         mode="min",
     )
 
-    # Checkpoint at every 3 epochs
+    # Checkpoint at every 6000 steps
     latest_checkpoint = ModelCheckpoint(
         filename="latest-{epoch}-{step}",
         monitor="step",
         mode="max",
-        every_n_train_steps=3000,
+        every_n_train_steps=6000,
         save_top_k = -1
     )
 
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     gamma_min = -13.3
     gamma_max = 13.3
     dataset = 'IllustrisTNG'
-    embedding_dim = 48
+    embedding_dim = 24
     norm_groups = 8
     n_blocks = 4
     learning_rate = 1e-4
@@ -82,7 +82,7 @@ if __name__ == "__main__":
             embedding_dim=embedding_dim,
             norm_groups=norm_groups,
             n_blocks=n_blocks,
-            add_attention=True,
+            # add_attention=True,
             # use_fourier_features=True
         ),
         dataset=dataset,
