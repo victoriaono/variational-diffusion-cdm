@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch import nn
 from torch import autograd, Tensor
+from torch.nn.functional import mse_loss
 from typing import Optional, Tuple
 from torch.special import expm1
 from tqdm import trange
@@ -472,9 +473,8 @@ class LightVDM(LightningModule):
         Returns:
             Tensor: loss
         """
-        conditioning, x = batch
-        loss = self.evaluate(batch, "val")
-        self.log_dict({'val_loss': loss}, on_epoch=True)
+        conditioning, x = batch    
+        loss = 0    
         
         if batch_idx == 0:
             sample = self.draw_samples(
@@ -482,11 +482,14 @@ class LightVDM(LightningModule):
                 batch_size=len(x),
                 n_sampling_steps=self.hparams.n_sampling_steps,
             )
-            fig=self.draw_figure(x,sample,conditioning,self.dataset)
+            loss = mse_loss(x, sample)
+            fig = self.draw_figure(x,sample,conditioning,self.dataset)
+            self.log_dict({'val_loss': loss}, on_epoch=True)
             
             if self.logger is not None:
                 self.logger.experiment.log_figure(figure=fig)
             plt.close()
+            
         return loss
 
     def test_step(self, batch, batch_idx):

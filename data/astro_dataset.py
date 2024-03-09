@@ -51,34 +51,25 @@ class AstroDataModule(LightningDataModule):
 
         if stage == "fit" or stage is None:
             if self.dataset == "SIMBA":
-                print("using simba")
                 mass_mstar = np.load(
-                    '/n/holystore01/LABS/itc_lab/Lab/Camels/2D_maps/Maps_Mstar_SIMBA_LH_z=0.00.npy'
+                    'Maps_Mstar_SIMBA_LH_z=0.00.npy'
                 )
                 mass_cdm = np.load(
-                    '/n/holystore01/LABS/itc_lab/Lab/Camels/2D_maps/Maps_Mcdm_SIMBA_LH_z=0.00.npy'
+                    'Maps_Mcdm_SIMBA_LH_z=0.00.npy'
                 )
             elif self.dataset == "Astrid":
-                print("using astrid")
                 mass_mstar = np.load(
-                    '/n/holystore01/LABS/itc_lab/Lab/Camels/2D_maps/Maps_Mstar_Astrid_CV_z=0.00.npy'
+                    'Maps_Mstar_Astrid_LH_z=0.00.npy'
                 )
                 mass_cdm = np.load(
-                    '/n/holystore01/LABS/itc_lab/Lab/Camels/2D_maps/Maps_Mcdm_Astrid_CV_z=0.00.npy'
+                    'Maps_Mcdm_Astrid_LH_z=0.00.npy'
                 )
             elif self.dataset=="IllustrisTNG":
-                # with h5py.File("/n/holystore01/LABS/itc_lab/Lab/Camels/2d_from_3d/LH256.h5","r") as h5:
-                #     mass_mstar=np.array(h5["mstar_z=0.0"])
-                #     mass_cdm=np.array(h5["mcdm_z=0.0"])
-                #     params=np.array(h5["params"])
-
-                print("using illustris 2D set")
-
                 mass_mstar = np.load(
-                    '/n/holystore01/LABS/itc_lab/Lab/Camels/2D_maps/Maps_Mstar_IllustrisTNG_LH_z=0.00.npy'
+                    'Maps_Mstar_IllustrisTNG_LH_z=0.00.npy'
                 )
                 mass_cdm = np.load(
-                    '/n/holystore01/LABS/itc_lab/Lab/Camels/2D_maps/Maps_Mcdm_IllustrisTNG_LH_z=0.00.npy'
+                    'Maps_Mcdm_IllustrisTNG_LH_z=0.00.npy'
                 )
 
             mass_mstar = Tensor(mass_mstar).unsqueeze(1)
@@ -94,10 +85,10 @@ class AstroDataModule(LightningDataModule):
 
         if stage == "test" or stage is None:
             mass_mstar = np.load(
-                '/n/holystore01/LABS/itc_lab/Lab/Camels/2D_maps/Maps_Mstar_IllustrisTNG_1P_z=0.00.npy'
+                'Maps_Mstar_IllustrisTNG_1P_z=0.00.npy'
             )
             mass_cdm = np.load(
-                '/n/holystore01/LABS/itc_lab/Lab/Camels/2D_maps/Maps_Mcdm_IllustrisTNG_1P_z=0.00.npy'
+                'Maps_Mcdm_IllustrisTNG_1P_z=0.00.npy'
             )
 
             mass_mstar = Tensor(mass_mstar).unsqueeze(1)

@@ -227,4 +227,10 @@ def draw_figure(x,sample,conditioning,dataset):
     ax.flat[4].set_xlabel('k',fontsize=fontsize)
     ax.flat[4].set_ylabel('P(k)',fontsize=fontsize)
     ax.flat[4].set_title("Power Spectrum", fontsize=fontsize)
+    mcdm_gen = sample.cpu().numpy()
+    nmaps = mcdm_gen.shape[0]
+    flattened_sample = np.average(mcdm_gen.reshape(nmaps,-1),axis=-1)
+    flattened_x = np.average(x.cpu().numpy().reshape(nmaps,-1),axis=-1)
+    ax.flat[5].scatter(flattened_x, flattened_sample)
+    ax.flat[5].plot(flattened_x, flattened_x, color='grey')
     return fig
