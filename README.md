@@ -1,2 +1,3 @@
 # camels
-Summer 2023 HCRP Project
+
+Diffusion Generative Model to reconstruct dark matter density maps from the CAMELS Multifield Dataset
