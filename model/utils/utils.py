@@ -5,9 +5,6 @@ import math
 import matplotlib.pyplot as plt
 from data.constants import norms, boxsize
 
-def to_np(ten):
-    return ten.detach().cpu().numpy()
-
 def kl_std_normal(mean_squared, var):
     return 0.5 * (var + mean_squared - torch.log(var.clamp(min=1e-15)) - 1.0)
 
@@ -23,14 +20,17 @@ class FixedLinearSchedule(torch.nn.Module):
 
 
 class LearnedLinearSchedule(torch.nn.Module):
-    def __init__(self, gamma_min, gamma_max):
+    def __init__(self, gamma_min, gamma_max,gamma_min_max=None):
         super().__init__()
+        self.gamma_min_max=gamma_min_max
         self.b = torch.nn.Parameter(torch.tensor(gamma_min))
         self.w = torch.nn.Parameter(torch.tensor(gamma_max - gamma_min))
 
     def forward(self, t):
-        # abs needed to make it monotonic
-        return self.b + self.w.abs() * t
+        if self.gamma_min_max is None:
+            return self.b + self.w.abs() * t
+        else:
+            return torch.clamp(self.b,min=None,max=self.gamma_min_max) + self.w.abs() * t
 
 
 @torch.no_grad()

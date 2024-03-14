@@ -9,7 +9,7 @@ from torch.special import expm1
 from tqdm import trange
 from torch.distributions.normal import Normal
 from lightning.pytorch import LightningModule
-from .nn_tools import FixedLinearSchedule, LearnedLinearSchedule, NNSchedule, kl_std_normal
+from utils.utils import FixedLinearSchedule, LearnedLinearSchedule, NNSchedule, kl_std_normal
 
 class VDM(nn.Module):
     def __init__(
