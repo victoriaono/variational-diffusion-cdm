@@ -2,7 +2,7 @@
 
 [Victoria Ono](mailto:victoriaono@college.harvard.edu), Core Francisco Park, Nayantara Mudur et al.
 
-[![arXiv](https://img.shields.io/badge/arXiv-2311.17141%20-green.svg)](https://arxiv.org/abs/2403.10648)
+[![arXiv](https://img.shields.io/badge/arXiv-2403.10648%20-green.svg)](https://arxiv.org/abs/2403.10648)
 
 ![Figure](notebooks/imshows.png)
 
