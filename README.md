@@ -2,6 +2,8 @@
 
 [Victoria Ono](mailto:victoriaono@college.harvard.edu), Core Francisco Park, Nayantara Mudur et al.
 
+[![arXiv](https://img.shields.io/badge/arXiv-2311.17141%20-green.svg)](https://arxiv.org/abs/2403.10648)
+
 ![Figure](notebooks/imshows.png)
 
 ## Abstract
@@ -18,3 +20,17 @@ The CAMELS Multifield Dataset used to train the model can be found [here](https:
 - The score model is called from [`model/networks.py`](models/networks.py).
 - The [`data`](data/) directory contains files for constructing the PyTorch DataLoaders for the training datasets.
 - The [`notebooks`](notebooks/) directory contains notebooks used to produce results for the paper.
+
+## Citation
+
+If you use this code, please cite our paper:
+```
+@misc{ono2024debiasing,
+      title={Debiasing with Diffusion: Probabilistic reconstruction of Dark Matter fields from galaxies with CAMELS}, 
+      author={Victoria Ono and Core Francisco Park and Nayantara Mudur and Yueying Ni and Carolina Cuesta-Lazaro and Francisco Villaescusa-Navarro},
+      year={2024},
+      eprint={2403.10648},
+      archivePrefix={arXiv},
+      primaryClass={astro-ph.CO}
+}
+```
