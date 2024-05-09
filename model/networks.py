@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch import einsum, nn, pi, softmax
-from .nn_tools import zero_init
+from utils import zero_init
 
 def get_timestep_embedding(
     timesteps,
